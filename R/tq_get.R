@@ -568,23 +568,15 @@ tq_get_util_2 <- function(x, get, complete_cases, map, ...) {
             dplyr::select(year, date, adjusted)
 
         # Get key ratios
-        valuations_colnames <- ifelse(
-            ticker_geog == 'CDN',
-            c("Revenue CAD Mil",
-              "Shares Mil",
-              "Earnings Per Share CAD",
-              "Book Value Per Share * CAD",
-              "Operating Cash Flow CAD Mil"),
-            c("Revenue USD Mil",
-              "Shares Mil",
-              "Earnings Per Share USD",
-              "Book Value Per Share * USD",
-              "Operating Cash Flow USD Mil")
-        )
+        if (ticker_geog == 'CDN') {
+            valuations_colnames <- c("Revenue CAD Mil", "Shares Mil", "Earnings Per Share CAD", "Book Value Per Share * CAD", "Operating Cash Flow CAD Mil")
+        } else {
+            valuations_colnames <- c("Revenue USD Mil", "Shares Mil", "Earnings Per Share USD", "Book Value Per Share * USD", "Operating Cash Flow USD Mil")
+        }
         valuations_1 <- key_ratios_bind %>%
             dplyr::filter(section == "Financials") %>%
             dplyr::filter(category %in% valuations_colnames) %>%
-            dplyr::rename(c("Revenue Mil",
+            dplyr::setNames(c("Revenue Mil",
                             "Shares Mil",
                             "Earnings Per Share",
                             "Book Value Per Share",
