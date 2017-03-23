@@ -442,14 +442,14 @@ tq_get_util_2 <- function(x, get, complete_cases, map, ...) {
     tryCatch({
 
         # Download file
-        stock_exchange <- c("XNAS", "XNYS", "XASE") # mornginstar gets from various exchanges
+        stock_exchange <- c("XNAS", "XNYS", "XASE", "XTSE") # mornginstar gets from various exchanges
         url_base_1 <- 'http://financials.morningstar.com/finan/ajax/exportKR2CSV.html?&callback=?&t='
         url_base_2 <- '&region=usa&culture=en-US&cur=&order=asc'
         # Three URLs to try
         url <- paste0(url_base_1, stock_exchange, ":", x, url_base_2)
 
         # Try various stock exchanges
-        for(i in 1:3) {
+        for(i in 1:length(stock_exchange)) {
             text <- httr::RETRY("GET", url[i], times = 5) %>%
                 httr::content()
 
@@ -463,6 +463,7 @@ tq_get_util_2 <- function(x, get, complete_cases, map, ...) {
 
                 # If text does not contain "We're sorry" message, break
                 if (!text_test) {
+                    ticker_geog <- ifelse(stock_exchange[i] == 'XTSE', 'CDN', 'USA')
                     break
                 }
             }
@@ -567,30 +568,44 @@ tq_get_util_2 <- function(x, get, complete_cases, map, ...) {
             dplyr::select(year, date, adjusted)
 
         # Get key ratios
+        valuations_colnames <- ifelse(
+            ticker_geog == 'CDN',
+            c("Revenue CAD Mil",
+              "Shares Mil",
+              "Earnings Per Share CAD",
+              "Book Value Per Share * CAD",
+              "Operating Cash Flow CAD Mil"),
+            c("Revenue USD Mil",
+              "Shares Mil",
+              "Earnings Per Share USD",
+              "Book Value Per Share * USD",
+              "Operating Cash Flow USD Mil")
+        )
         valuations_1 <- key_ratios_bind %>%
             dplyr::filter(section == "Financials") %>%
-            dplyr::filter(category %in% c("Revenue USD Mil",
-                                          "Shares Mil",
-                                          "Earnings Per Share USD",
-                                          "Book Value Per Share * USD",
-                                          "Operating Cash Flow USD Mil")) %>%
+            dplyr::filter(category %in% valuations_colnames) %>%
+            dplyr::rename(c("Revenue Mil",
+                            "Shares Mil",
+                            "Earnings Per Share",
+                            "Book Value Per Share",
+                            "Operating Cash Flow Mil"))
             dplyr::mutate(year = lubridate::year(date)) %>%
             dplyr::select(year, category, value) %>%
             tidyr::spread(key = category, value = value) %>%
-            dplyr::mutate(`Revenue Per Share USD` = `Revenue USD Mil` / `Shares Mil`,
-                          `Cash Flow Per Share USD` = `Operating Cash Flow USD Mil` / `Shares Mil`) %>%
+            dplyr::mutate(`Revenue Per Share` = `Revenue Mil` / `Shares Mil`,
+                          `Cash Flow Per Share` = `Operating Cash Flow Mil` / `Shares Mil`) %>%
             dplyr::select(year,
-                          `Earnings Per Share USD`,
-                          `Revenue Per Share USD`,
-                          `Book Value Per Share * USD`,
-                          `Cash Flow Per Share USD`)
+                          `Earnings Per Share`,
+                          `Revenue Per Share`,
+                          `Book Value Per Share`,
+                          `Cash Flow Per Share`)
 
         # Merge and calculate valuations
         valuation <- dplyr::left_join(valuations_1, valuations_2, by = "year") %>%
-            dplyr::mutate(`Price to Earnings`  = adjusted / `Earnings Per Share USD`,
-                          `Price to Sales`     = adjusted / `Revenue Per Share USD`,
-                          `Price to Book`      = adjusted / `Book Value Per Share * USD`,
-                          `Price to Cash Flow` = adjusted / `Cash Flow Per Share USD`) %>%
+            dplyr::mutate(`Price to Earnings`  = adjusted / `Earnings Per Share`,
+                          `Price to Sales`     = adjusted / `Revenue Per Share`,
+                          `Price to Book`      = adjusted / `Book Value Per Share`,
+                          `Price to Cash Flow` = adjusted / `Cash Flow Per Share`) %>%
             dplyr::select(date,
                           `Price to Earnings`,
                           `Price to Sales`,
